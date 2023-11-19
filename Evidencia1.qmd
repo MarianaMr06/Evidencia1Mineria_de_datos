@@ -1,0 +1,683 @@
+---
+title: "Evidencia 1. Estadística multivariante."
+autors: "Mariana Manzano Rico A01735770"
+subject: "Minería de Datos"
+profesors: "Yamil Burguete, Eric Larsen"
+date: "11/18/2023"
+format: html
+editor: visual
+---
+
+# **VARIABLES CRÍTICAS PARA PRONOSTICAR EL VALOR DE INMUEBLES EN CDMX**
+
+**Mariana Manzano Rico A01735770**
+
+**Materia: Minería de Datos**
+
+**Profesores: Dr. Yamil Burguete, Dr. Eric Larsen**
+
+La CDMX es una de las ciudades más importantes del mundo así como de las más grandes, pues si bien su territorio es el más pequeño del País, tiene una de las más grandes poblaciones a nivel mundial. Tiene al menos cuatro escenarios reconocidos como Patrimonio de la Humanidad y un sin fin de actividades culturales, recreativas, de negocios, entre otras (México Desconocido, s.f.).
+
+En ella viven al menos 9.21 millones de personas (INEGI, 2020), las cuales necesitan un hogar para vivir. Sin embargo, las diferencias en su calidad de vida varían dependiendo de su entorno, actividades profesionales y clases socioeconómicas.
+
+Es por ello por lo que en este reporte nos enfocaremos en determinar cuáles son aquellas características que definen el valor de una casa y para qué segmento de mercado están dirigidos, haciendo uso de técnicas estadísticas y programación para definir dichas variables, generar insights y desarrollar estrategias de venta para nuestra empresa del caso "Erich Zann y Asociados", la cual es una compañía sobresaliente en la industria inmobiliaria y que desean hacer uso de estas tecnologías para diferenciarse de sus competidores.
+
+```{r,include=FALSE}
+#Este chunk nos permitirá utilizar lenguaje de python en R studio.
+library(reticulate)
+
+knitr::opts_chunk$set(echo=TRUE)
+```
+
+```{python,include=FALSE}
+from platform import python_version
+version=python_version()
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+
+```
+
+## Análisis y pre-procesamiento de la base de datos.
+
+La base con la que contamos incluye diferentes variables que permiten comprender el comportamiento de los bienes inmuebles en la CDMX, esta puede ser visualizada en la siguiente tabla:
+
+```{python,echo=FALSE}
+# Primer vustazo del db con información de las variables.
+df = pd.read_excel("RetoConglomerados.xlsx")
+df.info()
+```
+
+**Inspección de variables categóricas.**
+
+En total contamos con 9 variables de este tipo, "Alcaldia" y "Colonia" hacen referencia a la ubicación de los inmuebles mientras que "Cocina_equip","Gimnasio","Amueblado","Alberca","Terraza","Elevador" y "Lugares_estac" hacen referencia a las amenidades con las que cuentan los inmuebles.
+
+**Inspección de variables numéricas.**
+
+Contamos con 14 variables de este tipo, desde la variable "X1" a "X10" nos describe la situación del entorno en la que se encuentra el inmueble como lo son la población analfabeta, que no asiste a la escuela, que no cuenta con servicios de salud, o viviendas con hacinamiento, sin agua entubada, energía eléctrica, celular o computadora, estas se miden según el porcentaje de la población total que lo padece. También observamos variables que de manera numérica nos ofrecen una descripción del inmueble como lo son "m2_construido", "Baños", "Recamaras" y "Precio_m2". Esta última será nuestra variable de estudio.
+
+### **Limpieza de datos categóricos**
+
+Utilizamos la función "freq_tbl" para identificar los factores de cada categoría, a simple vista detectamos errores en la recopilación de los datos, existen caracteres con mayúsculas, con minúsculas o con espacios no adecuados, además verificamos que la variable "Lugares_estac" tendría que ser de naturaleza numérica pero encontramos una cadena, en este caso decidimos reemplazarlo por el valor "1", a continuación procederemos a realizar la limpieza adecuada.
+
+```{python,echo=FALSE}
+# Esta línea nos permitirá observar la frecuencia de los factores de las variables de tipo object.
+
+from funpymodeling.exploratory import freq_tbl
+
+freq_tbl(df)
+
+```
+
+```{python,echo=FALSE}
+# Eliminamos espacios en las respuestas.
+df["Cocina_equip"]=df["Cocina_equip"].replace("Si ","Si")
+df["Gimnasio"]=df["Gimnasio"].replace("Si ","Si")
+df["Gimnasio"]=df["Gimnasio"].replace("No ","No")
+df["Amueblado"]=df["Amueblado"].replace("Si ","Si")
+df["Amueblado"]=df["Amueblado"].replace("No ","No")
+df["Alberca"]=df["Alberca"].replace("si ","Si")
+df["Alberca"]=df["Alberca"].replace("Si ","Si")
+df["Alberca"]=df["Alberca"].replace("No ","No")
+df["Terraza"]=df["Terraza"].replace("Si ","Si")
+df["Terraza"]=df["Terraza"].replace("No ","No")
+df["Elevador"]=df["Elevador"].replace("Si ","Si")
+df["Elevador"]=df["Elevador"].replace("si","Si")
+df["Lugares_estac"]=df["Lugares_estac"].replace("Si",1)
+
+```
+
+Posteriormente se hizo una nueva visualización para verificar que no hayan datos sucios y observamos que nuestra base de datos está casi lista para ser estudiada.
+
+```{python,echo=FALSE}
+freq_tbl(df)
+```
+
+### Verificación de outliers
+
+Realizamos un boxplot con la metodología de las cercas de Tukey para identificar los posibles valores fuera de rango.
+
+En primer lugar verificamos las variables "X1" hasta "X10".
+
+```{python,echo=FALSE}
+df1=df.iloc[ : , 2:12]
+fig = plt.figure(figsize =(15, 8))
+df1.plot(kind='box', vert=False)
+plt.title("Valores Atípicos Set Variables X")
+plt.show() 
+
+```
+
+De manera gráfica nos salta a la vista el comportamiento de los datos de la variable "X7", la cual parecen distribuirse en un rango que va desde 0 a 3, sin embargo existen algunos elementos de esta que sobrepasan el límite establecido por las cercas, al ser un valor que representa el total de la información consideramos que no es necesario hacer una corrección a esta variable.
+
+Después hacemos lo mismo para observar la columna de metros cuadrados construidos:
+
+```{python,echo=FALSE}
+df2=df.iloc[ : , 18]
+fig = plt.figure(figsize =(15, 8))
+df2.plot(kind='box', vert=False)
+plt.title("Valores Atípicos variable m2_construido")
+plt.show() 
+```
+
+De igual manera observamos una seria de datos que sobresalen de los límites de las cercas.
+
+Posteriormente lo repetimos para ver los valores en las amenidades de los inmuebles:
+
+```{python,echo=FALSE}
+df3=df.iloc[ : , 19:22]
+fig = plt.figure(figsize =(18, 8))
+df3.plot(kind='box', vert=False)
+plt.title("Valores Atípicos Variables amenidades")
+plt.show() 
+```
+
+Sin embargo, consideramos que estos no son necesarios de limpiar debido a los valores presentados.
+
+Finalmente lo repetimos para el valor de precio por metro cuadrado y observamos que hay un valor muy extremo, pero dado que es un solo valor, se decide eliminar dicho registro.
+
+```{python,echo=FALSE}
+df4=df.iloc[ : , 22]
+fig = plt.figure(figsize =(18, 8))
+df4.plot(kind='box', vert=False)
+plt.title("Valores Atípicos variable Precio_m2")
+plt.show() 
+
+```
+
+```{python,echo=FALSE}
+df = df[(df["Precio_m2"]< 120000)]
+
+df4=df.iloc[ : , 22]
+fig = plt.figure(figsize =(18, 8))
+df4.plot(kind='box', vert=False)
+plt.title("Valores Atípicos variable Precio_m2")
+plt.show() 
+
+
+```
+
+## Análisis de conglomerados.
+
+Implementaremos un análisis de conglomerados para definir segmentos de mercado en el sector inmobiliario. Esta técnica nos permitirá agrupar propiedades similares según características clave, facilitando así una comprensión más detallada de las preferencias y tendencias del mercado. A través de este análisis, se buscará identificar patrones que permitan una estrategia de comercialización más enfocada y personalizada, optimizando la oferta de inmuebles de acuerdo con las necesidades específicas de cada segmento identificado.
+
+### Selección de las variables
+
+Para ello, decidimos usar las variables de precio por metros cuadrados y metros cuadrados de cada inmueble, pues estas dos variables forman el valor total de la casa y permitirán indicarnos cómo deben agruparse estas casas para llegar a distintos mercados.
+
+```{python,echo=FALSE}
+# Seleccionamos las 2 variables de interés.
+Conglomerado = df.iloc[ : , [18,22]]
+Conglomerado.describe()
+```
+
+### Método de similitud o distancia
+
+La decisión es utilizar el método euclidiano.
+
+```{python,echo=FALSE}
+#Código utilizado de la clase "Análisis de conglomerados".
+#Código realizado con la ayuda de ChatGPT
+# Función para calcular la distancia euclidiana entre dos filas
+#def euclidean_distance(row1, row2):
+ #   return np.sqrt(np.sum((row1 - row2) ** 2))
+
+# Crear una matriz de distancias euclidianas
+#distances = np.zeros((len(Conglomerado), len(Conglomerado)))
+
+#for i in range(len(Conglomerado)):
+ #   for j in range(i, len(Conglomerado)):
+  #     dist = euclidean_distance(Conglomerado.iloc[i], Conglomerado.iloc[j])
+   #    distances[i, j] = dist
+    #   distances[j, i] = dist  # La matriz es simétrica, por lo que llenamos ambos lados
+
+# Crear un DataFrame de distancias
+#distance_clusters = pd.DataFrame(distances, index=Conglomerado.index, columns=Conglomerado.index)
+
+#distance_clusters #ahora contiene las distancias euclidianas entre todas las filas de tu DataFrame
+```
+
+### Procedimiento de agrupamiento
+
+Optamos por implementar el procedimiento k-means en este caso, ya que hemos categorizado la naturaleza de la información y buscamos llevar a cabo un análisis no jerárquico. Este enfoque implica la división de cada punto de datos en grupos de manera independiente, sin tener en cuenta la existencia de subgrupos o clusters dentro de otros clusters. El objetivo principal es lograr una clasificación clara y directa de los datos, simplificando así la interpretación de los resultados y permitiendo una segmentación efectiva de los bienes inmuebles en categorías distintas.
+
+### Decidir número de conglomerados
+
+Para definir el número de clústers utilizamos el método del codo, el cual nos dará una gráfica que indicará qué número de conglomerados final debemos de tener.
+
+```{python,echo=FALSE}
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+
+# Se estandarizan los valores
+scaler = StandardScaler()
+X = scaler.fit_transform(Conglomerado)
+
+# Se calcula el wcss (Suma de cuadrados de las distancias intra-cluster)
+# se almacena el valor en la lista wcss
+wcss = []
+for k in range(1, 11):
+    kmeans = KMeans(n_clusters=k, random_state=42)
+    kmeans.fit(X)
+    wcss.append(kmeans.inertia_)
+
+# Se grafica la curva.
+plt.figure(figsize=(8, 6))
+plt.plot(range(1, 11), wcss, marker='o', linestyle='-', color='b')
+plt.title('Método del codo para K óptima')
+plt.xlabel('Número de clusters (K)')
+plt.ylabel('Within-Cluster Sum of Squares (WCSS)')
+plt.grid(True)
+plt.show()
+```
+
+En este caso, nos dice que es de 4 conglomerados, pues es en este punto donde hay mayor diferencia entre clústers y menor diferencia dentro de ellos.
+
+```{python,echo=FALSE}
+from scipy.cluster.hierarchy import dendrogram, linkage
+
+# Estandarización (esto afecta si no se realiza)
+scaler = StandardScaler()
+X_std = scaler.fit_transform(Conglomerado)
+
+linked = linkage(X_std, method='ward') #como podrán observar, son las distancias
+
+plt.figure(figsize=(12, 6))
+dendrogram(Z=linked, orientation='top', distance_sort='descending', show_leaf_counts=True)
+plt.title('Dendograma de Conglomerados Jerárquico')
+plt.ylabel('Distancia')
+plt.show()
+
+
+```
+
+Un dendrograma es un diagrama de árbol utilizado en análisis de clustering que muestra la estructura jerárquica de agrupamientos entre datos. Las ramas del dendrograma representan la similitud entre los elementos, y la altura de las uniones refleja la distancia o disimilitud entre los grupos.
+
+### División de Conglomerados
+
+Posteriormente y ya sabiendo cuántos conglomerados necesitamos para tener un agrupamiento óptimo, procedemos a hacer la separación como se observa en las siguientes imágenes.
+
+```{python,echo=FALSE, include=FALSE}
+from sklearn.cluster import AgglomerativeClustering
+
+
+clustering_model = AgglomerativeClustering(n_clusters=4, affinity='euclidean', linkage='ward')
+clustering_model.fit(df[['Precio_m2','m2_construido' ]])
+clustering_model.labels_
+```
+
+```{python,echo=FALSE}
+
+# Código elaborado por ChatGPT, agregó la línea para identificar los centroides.
+# Asignando etiquetas de clusters a los datos
+data_labels = clustering_model.labels_
+
+# Agregando las etiquetas al DataFrame, aquí aggamos una nueva columnba que define el cluster de la observación.
+df['Cluster'] = data_labels
+
+# Visualización de datos originales con colores por clusters
+sns.scatterplot(x='Precio_m2',
+                y='m2_construido',
+                data=df,
+                hue='Cluster',
+                palette='bright')
+
+# Encontrar centroides utilizando KMeans (o el algoritmo que hayas usado)
+num_clusters = len(set(data_labels))  # Número de clusters
+kmeans = KMeans(n_clusters=num_clusters)
+kmeans.fit(df[['Precio_m2', 'm2_construido']])
+
+# Obteniendo los centroides de cada cluster
+centroids = kmeans.cluster_centers_
+
+# Graficar los centroides en el mismo gráfico de dispersión
+plt.scatter(centroids[:, 0], centroids[:, 1], marker='x', s=200, c='black', label='Centroides')
+plt.legend()
+plt.title('Clusters con centroides')
+plt.show()
+
+
+```
+
+Podemos observar una división pura, pues los clústers están divididos a la perfección.
+
+### Definición de los conglomerados.
+
+En nuestro análisis contamos con un total de 4 perfiles de acuerdo a la compra de inmubles en la CDMX tomando en consideración las variables de "Precio_m2" y "m2_construido", la clasificación se explica a continuación.
+
+```{python,echo=FALSE}
+df["Cluster"]=df["Cluster"].replace(0,"A/B: Clase Alta")
+df["Cluster"]=df["Cluster"].replace(1,"C: Clase Media")
+df["Cluster"]=df["Cluster"].replace(2,"D+: Clase Media Baja")
+df["Cluster"]=df["Cluster"].replace(3,"C+: Clase Media Alta")
+```
+
+```{python,echo=FALSE}
+# descarganos el db limpio.
+#cluster_results.to_csv("Clusters.csv")
+
+```
+
+```{python,echo=FALSE}
+cluster_results = df.copy()
+cluster_results['Cluster Labels'] = clustering_model.labels_
+### Esta línea nos da el resultado de la evaluación de una condición
+#cluster_results['Cluster Labels'] == 3
+### Podemos usar este resultado para filtrar una serie.
+#La creación de 4 variables por cluster es para identificar un análisis descriiptivo de cada conglomerado.
+cluster_0 = cluster_results.loc[cluster_results['Cluster Labels'] == 0]
+cluster_1 = cluster_results.loc[cluster_results['Cluster Labels'] == 1]
+cluster_2 = cluster_results.loc[cluster_results['Cluster Labels'] == 2]
+cluster_3 = cluster_results.loc[cluster_results['Cluster Labels'] == 3]
+```
+
+**Perfil 1. A/B: Clase Alta (Cluster 0)**\
+Este perfil, aunque representativo de una minoría con solo 9 casos, se distingue por propiedades amplias de lujo, superando significativamente el costo promedio. Cuenta con aproximadamente 3.5 baños , 3 habitaciones, y espacio para estacionar hasta 3 vehículos. El precio por metro cuadrado alcanza los \$27,566, contrastando con los \$657 del promedio citadino. Este segmento refleja un estilo de vida elevado, con individuos predominantemente con educación universitaria o superior. Residen en residencias de lujo que incluyen todas las comodidades deseables (Gutiérrez, 2004).
+
+**Perfil 2. C+: Clase Media Alta (Cluster 3)**\
+Denominamos este perfil a aquellos que buscan adquirir un inmueble con espacio adecuado para el crecimiento de una familia, compuesta por una pareja mayor de 35 años con más de un hijo y una posición económica sólida. Evitan los precios del perfil 1 y cuentan con 2-3 baños, habitaciones, y estacionamientos. El precio promedio por metro cuadrado se sitúa en \$12,714. Este segmento engloba a aquellos cuyos ingresos y estilo de vida superan ligeramente a la clase media, con individuos mayormente con educación universitaria. Residen en viviendas propias, algunas de lujo, y disfrutan de todas las comodidades (Gutiérrez, 2004).
+
+**Perfil 3. C: Clase Media (Cluster1)**\
+Este tipo de inmueble está diseñado para atraer a familias jóvenes, con una pareja que está dando sus primeros pasos en el desarrollo de sus carreras y con, como máximo, un hijo. Estas viviendas suelen contar con 2 habitaciones, cada una con baños integrados, espacio para estacionar de 1 a 2 vehículos, y un precio por metro cuadrado cercano a \$4,909. Esta categoría representa aproximadamente el 30% de todos los registros y se alinea con lo que comúnmente se clasifica como clase media. Los individuos en este segmento tienen principalmente educación de nivel preparatoria. Las viviendas pertenecientes a este grupo pueden ser casas o departamentos, ya sea de propiedad o alquilados, con algunas comodidades (Gutiérrez, 2004).
+
+**Perfil 4. D+: Clase Media Baja (Cluster2)**\
+Este perfil es más relacionado con personas solteras, ofreciendo instalaciones que satisfacen cómodamente las necesidades de un solo individuo, aunque algunas excepciones pueden incluir más de una recámara o baño dependiendo de la ubicación. En este tipo de vivienda, la disponibilidad de estacionamiento puede ser limitada, reflejando un precio por metro cuadrado promedio de \$362, lo que representa un 50% menos en comparación con el promedio general. Este segmento abarca hogares con ingresos y estilos de vida ligeramente inferiores a la clase media, llevando un nivel de vida mejorado dentro de la clase baja. Los individuos en este grupo generalmente tienen educación de nivel secundaria o primaria completa. La mayoría de las viviendas en este segmento son de propiedad propia, aunque algunas se alquilan, y algunas están destinadas a vivienda de interés social (Gutiérrez, 2004).
+
+Existen otras dos clases socioeconómicas que no entran en nuestro análisis, pues no tienen el poder adquisitivo de comprar una casa.
+
+Ahora que ya sabemos cómo están divididos nuestros datos, podemos generar estrategias de marketing enfocadas en cada séctor, las cuales serán vistas más adelante.
+
+## ANÁLISIS ANOVA
+
+El análisis de varianza, conocido como ANOVA, es una técnica estadística utilizada para evaluar si existen diferencias significativas entre las medias de tres o más grupos. Su aplicación se centra en determinar si las variaciones observadas entre los grupos son estadísticamente significativas o simplemente producto del azar. Al calcular la relación entre estas variabilidades, ANOVA proporciona una prueba estadística que permite tomar decisiones informadas sobre si al menos uno de los grupos difiere significativamente de los demás.
+
+En el caso se menciona que una de las características de los inmuebles que más influye en los precios es la ubicación, por lo cual nuestro objetivo es generar un análisis de este tipo para identificar si hay diferencias entre los precios de las alcaldías y determinar estrategias de ventas dependiendo de dichas diferencias.
+
+Por otro lado, se cree que otras de las variables que influyen en el precio de un inmueble es si la cocina es equipada (cuenta con refrigerador, estufa, etc) y si tiene terraza. Es por ello que también se hará un análisis ANOVA de dos vías con ambas variables.
+
+```{python,echo=FALSE}
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
+from statsmodels.formula.api import ols
+import statsmodels.api as sm
+import scipy.stats as stats
+
+```
+
+### OWA
+
+En este primer análisis nos enfocaremos en la "Alcaldía" y "Precio_m2" las cuales serán nuestras variables de estudio. Para ello, primero generamos nuestras hipótesis del análisis.
+
+**Hipótesis**\
+La prueba de hipótesis queda declarada de la siguiente manera:\
+*• H0 = No existe diferencia significativa entre el precio por m2 y las distintas alcaldías de la CDMX.\
+• H1 = Existe diferencia significativa entre el precio por m2 y las distintas alcaldías de la CDMX.*
+
+Procedemos a hacer el análisis con un nivel de significancia del 95%.
+
+```{python,echo=FALSE}
+OWA1 = df.iloc[ : , [0,22]]
+OWA1
+```
+
+```{python,echo=FALSE}
+
+agrudatos1 = [group[1]['Precio_m2'] for group in OWA1.groupby('Alcaldia')] #
+
+#Realizamos la prueba ANOVA 1 via.
+estadistico_f, p_valor = stats.f_oneway(*agrudatos1)#desempaquetamos la lista en elementos individuales.
+
+
+# Imprimimos el resultado
+print("ANOVA de una vía - Resultados:")
+print(f"Puntaje F: {estadistico_f:.2f}")
+print(f"P-valor: {p_valor:.4f}")
+
+# Para simplificar la interpretación de los resultados:
+alpha = 0.05 #Podemos elegir un valor considerando nuestro nivel de confianza
+if p_valor < alpha:
+    print("Se rechaza la hipótesis nula. Existen diferencias significativas entre grupos.")
+else:
+    print("No se rechaza la hipótesis nula. No existen diferencias significativas entre grupos.")
+```
+
+La observación revela que el valor de p es inferior a 0.001, indicando que al menos uno de los factores en la variable "Alcaldía" presenta una diferencia estadísticamente significativa en cuanto al precio en comparación con las demás. En consecuencia, hemos optado por generar una representación gráfica con el objetivo de visualizar la distribución de los precios en cada una de estas ubicaciones.
+
+```{python,echo=FALSE}
+#visualizamos los datos:
+# Create a box plot
+plt.figure(figsize=(14, 6))
+sns.boxplot(x='Precio_m2', y='Alcaldia', data=OWA1, palette='Set2')
+plt.title('Box Plot Precio por Alcaldia')
+plt.xlabel('Precio_m2')
+plt.ylabel('Alcaldia')
+plt.show()
+
+```
+
+A primera vista, resaltan tres alcaldías con precios por metro cuadrado notablemente superiores en comparación con las demás: Miguel Hidalgo, Cuajimalpa y Álvaro Obregón. En contraste, las alcaldías con precios más bajos por metro cuadrado son Venustiano Carranza, Gustavo A. Madero e Iztapalapa. No obstante, para validar de manera precisa qué alcaldías presentan diferencias significativas en sus precios en comparación con las demás, hemos optado por emplear la prueba post-hoc de Tukey.
+
+### Prueba Post-Hoc de Tukey
+
+```{python,echo=FALSE}
+tukeyresultado1 = pairwise_tukeyhsd(OWA1['Precio_m2'], OWA1['Alcaldia'])
+print("\nResultados Tukey-Kramer prueba Post Hoc:")
+print(tukeyresultado1)
+```
+
+En esta tabla, podemos observar la diferencia de precios entre alcaldías más claramente, (las que dicen TRUE específicamente). Es con estas alcaldías significativamente diferentes a las demás, donde tenemos que aplicar diferentes estrategias de venta que impacten de manera correcta. Estas serán presentadas más adelante.
+
+## 2WA
+
+Como se mencionó con anterioridad, deseamos conocer si las amenidades que se ofrecen también impactan en el precio de una casa, por lo que procedemos a hacer el análisis de dos vías.
+
+**Hipótesis Cocina equipada**\
+*• H0 = No existe diferencia em el precio por m2 respecto a si cuenta con cocina equipada.\
+• H1 = Existe diferencia en el precio precio por m2 respecto a si cuenta con cocina equipada*
+
+**Hipótesis Terraza**\
+*• H0 = No existe diferencia em el precio por m2 respecto a si el inmueble tiene terraza.\
+• H1 = Existe diferencia en el precio precio por m2 respecto a si el inmueble tiene terraza.*
+
+```{python,echo=FALSE}
+TWA = df.iloc[ : , [12,16,22]]
+```
+
+```{python,echo=FALSE}
+# ANOVA de 2 vías.
+formula = 'Precio_m2 ~ Cocina_equip + Terraza'
+modelo = ols(formula, data=TWA).fit()
+tablANOVA = sm.stats.anova_lm(modelo, typ=2)
+
+# Imprimimos los resultados
+print("Resultados ANOVA de dos vías:")
+print(tablANOVA)
+```
+
+Genereamos el modelo, se rechazan ambas pruebas de hipótesis nulas por lo que sí existe una diferencia significativa entre grupos, esto debido a que el valor de PR es menor a 0.05.
+
+Observamos las diferencias de casas con terrazas y casas sin terraza, así como si incluyen o no cocina equipada. Notamos que sí hay diferencias entre las que cuentan y no con terraza, pero esto no es tan visible en si cuentan o no con cocina equipada.
+
+```{python,echo=FALSE}
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(12, 6))
+sns.boxplot(x='Terraza', y='Precio_m2', hue='Cocina_equip', data=TWA, palette='Set2')
+plt.title('Box plot de Casas con Terraza y su Precio')
+plt.xlabel('Terraza')
+plt.ylabel('Precio')
+plt.legend(title='Cocina Equipada')
+plt.show()
+```
+
+Finalmente, para determinar en qué grupos hay diferencias específicamente, generamos la prueba Post Hoc de Tukey.
+
+### Prueba Post-Hoc de Tukey
+
+```{python,echo=FALSE}
+# Realización de la prueba Post Hoc (Tukey HSD):
+# Ambueblado
+posthoc1 = pairwise_tukeyhsd(TWA['Precio_m2'], TWA['Terraza'], alpha=0.05)
+print("\nResultados de la prueba Tukey HSD para Inmuebles con Terraza:")
+print(posthoc1)
+
+# Para Cocina Equipada
+posthoc2 = pairwise_tukeyhsd(TWA['Precio_m2'], TWA['Cocina_equip'], alpha=0.05)
+print("\nResultados de la prueba Tukey HSD para Inmuebles con Cocina Equipada:")
+print(posthoc2)
+```
+
+Vemos que para ambos casos, hay diferencias significativas entre ambos grupos.
+
+## CLASIFICACIÓN BAYESIANA
+
+```{python,echo=FALSE}
+from sklearn.feature_extraction.text import TfidfVectorizer #una función más avanzada que vectorizar así nomás
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.metrics import roc_curve, roc_auc_score, accuracy_score, confusion_matrix, f1_score, precision_score, recall_score
+
+```
+
+Un modelo de clasificación bayesiana es un enfoque estadístico que se basa en el teorema de Bayes para realizar tareas de clasificación. Este método utiliza la probabilidad condicional para asignar categorías a nuevos datos, considerando la información previa y la evidencia acumulada. Se apoya en la actualización de creencias a medida que se obtiene nueva información, permitiendo una adaptación continua del modelo.
+
+Este será utilizado para pronosticar en qué categoría socioeconómica entra cada nueva casa dependiendo de las amenidades que presenten como:
+
+-   Cocina equipada
+
+-   Gimnasio
+
+-   Amueblado
+
+-   Alberca
+
+-   Terraza
+
+-   Elevador
+
+-   Baños
+
+-   Récamaras
+
+-   Lugares de estacionamiento
+
+Para ello, primero debemos cambiar los valores categóricos a numéricos, de modo que si un inmueble cuenta con cierta característica tenga un 1 como Sí y 0 como No.
+
+Por otro lado, nuestra variable que será pronosticada es "Clústers", una nueva variable que nos indica a qué grupo socioeconómico pertenece cada casa, basado en nuestro primer análisis de conglomerados.
+
+```{python,echo=FALSE}
+bayes=df.copy()
+
+bayes["Cocina_equip"]=bayes["Cocina_equip"].replace("Si",1)
+bayes["Cocina_equip"]=bayes["Cocina_equip"].replace("No",0)
+bayes["Gimnasio"]=bayes["Gimnasio"].replace("Si",1)
+bayes["Gimnasio"]=bayes["Gimnasio"].replace("No",0)
+bayes["Amueblado"]=bayes["Amueblado"].replace("Si",1)
+bayes["Amueblado"]=bayes["Amueblado"].replace("No",0)
+bayes["Alberca"]=bayes["Alberca"].replace("Si",1)
+bayes["Alberca"]=bayes["Alberca"].replace("No",0)
+bayes["Terraza"]=bayes["Terraza"].replace("Si",1)
+bayes["Terraza"]=bayes["Terraza"].replace("No",0)
+bayes["Elevador"]=bayes["Elevador"].replace("Si",1)
+bayes["Elevador"]=bayes["Elevador"].replace("No",0)
+
+```
+
+```{python,echo=FALSE}
+#X.info()
+
+```
+
+```{python,echo=FALSE}
+X = bayes[["Cocina_equip", "Gimnasio", "Amueblado", "Alberca", "Terraza", "Elevador", "Baños", "Recamaras", "Lugares_estac"]]
+y = bayes["Cluster"]
+```
+
+### Evaluación del Modelo
+
+Es necesario hacer una evaluación del modelo para saber si este tiene buenos resultados, por lo que dividimos nuestra base de datos actual en entrenamiento y test con una proporción de 80/20 respectivamente. Con el primer set de datos entrenaremos a nuestro modelo y con la segunda haremos un test para identificar la precisión y exactitud del modelo.
+
+```{python,echo=FALSE}
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+```
+
+```{python,echo=FALSE}
+# Clasificadores
+clasificadores = {
+    'Naive Bayes Multinomial': MultinomialNB(),
+}
+```
+
+Es así como obtenemos los siguientes resultados:
+
+```{python,echo=FALSE}
+# Entrenamiento y evaluación clasificadores
+results = {}
+
+for name, clf in clasificadores.items():
+    clf.fit(X_train, y_train)
+    y_pred = clf.predict(X_test)
+    
+    accuracy = accuracy_score(y_test, y_pred)
+    f1 = f1_score(y_test, y_pred, average='weighted') 
+    precision = precision_score(y_test, y_pred, average='weighted')
+    recall = recall_score(y_test, y_pred, average='weighted')
+    
+    results[name] = {
+        'Accuracy': accuracy,
+        'F1 Score': f1,
+        'Precision': precision,
+        'Recall (Sensibilidad)': recall
+    }
+
+```
+
+```{python,echo=FALSE}
+# Ver los resultados de exactitud, puntaje F1, precisión y sensibilidad
+print("Comparación de Métricas:")
+for name, metrics in results.items():
+    print(f"Clasificador: {name}")
+    print(f"Exactitud: {metrics['Accuracy']:.2f}")
+    print(f"Puntaje F1: {metrics['F1 Score']:.2f}")
+    print(f"Precisión: {metrics['Precision']:.2f}")
+    print(f"Sensibilidad (Recall): {metrics['Recall (Sensibilidad)']:.2f}")
+    print("\n")
+```
+
+Esto nos indica que el modelo es capaz de predecir con exactitud el 67% de las veces y tiene una precisión del 58%. Si bien estas variables no son excelentes, son lo suficientemente buenas para aplicarlas en nuestros pronósticos.
+
+### Modelo de predicción
+
+Finalmente, contamos con nuestro modelo para predicciones y haremos la siguiente prueba:
+
+```{python,echo=FALSE}
+#Predicciones función
+def predict_class_and_probabilities(nuevosDatos): 
+    
+    class_probabilities = clf.predict_proba([nuevosDatos])
+
+    
+    for class_idx, prob in enumerate(class_probabilities[0]):
+        print(f'Probabilidad por clase {class_idx}: {prob:.4f}')
+
+    
+    predicted_class = clf.predict([nuevosDatos])[0]
+    print(f'Clase Predicha: {predicted_class}')
+```
+
+Un inmueble que tenga las siguientes características:
+
+-   Cocina equipada: Sí
+
+-   Gimnasio: No
+
+-   Amueblado: No
+
+-   Alberca: Sí
+
+-   Terraza: Sí
+
+-   Elevador: Sí
+
+-   Baños: 3
+
+-   Récamaras: 3
+
+-   Lugares de estacionamiento: 2
+
+```{python, echo = FALSE}
+#Ejemplo de predicción
+ejemplo = [1, 0, 0, 1, 1, 1, 3, 3, 2]
+predict_class_and_probabilities(ejemplo)
+```
+
+Pertenece a la categoría Clase Media, debido a que esta obtuvo la probabilidad más alta, por lo cual, se deben aplicar estrategias de marketing de esta categoría.
+
+## Recomendaciones y Conclusiones
+
+Con todo ete análisis de información, hacemos las siguientes recomendaciones a la empresa:
+
+1.  **Estrategias de Marketing para Cada Cluster:** Para cada cluster identificado en nuestro análisis, implementaremos estrategias de marketing personalizadas. Por ejemplo, para el Clúster 0, que representa propiedades de lujo en áreas selectas, nos enfocaremos en campañas que resalten el estilo de vida exclusivo y las comodidades de estos inmuebles. Para el Clúster 3, que se orienta a la clase media alta, nuestras estrategias se centrarán en destacar la accesibilidad y el confort familiar de estas viviendas.
+
+    Para el Clúster 1 nos centraremos en campañas de promoción familiar, financiamiento pero sin dejar de lado la comodidad y algunos lujos. Para el Clúster 2 que es una Clase Media Baja, nos enfocaremos en campañas para personas solteras, precios competitivos, créditos y financiamientos, se pueden aplicar opciones de pago flexibles y se debe enfocar en las comodidades esenciales.
+
+2.  **Estrategias de Ventas para Cada Alcaldía:** Considerando las diferencias de precios y preferencias en cada alcaldía, adaptaremos nuestras estrategias de ventas. En alcaldías como Miguel Hidalgo, Cuajimalpa y Álvaro Obregón, donde los precios son más elevados, nos centraremos en resaltar la exclusividad y características premium. En contraste, en zonas con precios más bajos como Venustiano Carranza, Gustavo A. Madero e Iztapalapa, nos enfocaremos en promover la asequibilidad y características familiares.
+
+3.  **Diferenciación entre Cocinas y Terrazas:** Identificaremos las preferencias de los clientes en relación con cocinas equipadas y terrazas. Si la demanda indica una preferencia significativa por cocinas equipadas, incorporaremos esta característica como un punto destacado en nuestras campañas. Lo mismo aplicará para las terrazas. Esta diferenciación nos permitirá adaptar las estrategias de marketing y ventas según las preferencias específicas de cada segmento de clientes.
+
+4.  **Predicciones en Tiempo Real:** Implementaremos un sistema que realice predicciones en tiempo real cada vez que se agregue un nuevo inmueble al catálogo. Esto nos permitirá ajustar nuestras estrategias de marketing y ventas de manera ágil y adaptarnos a las demandas cambiantes del mercado.
+
+5.  **Identificación de Alcaldía para Estrategias de Ventas Adicionales:** Después de determinar a qué cluster pertenece un nuevo inmueble, identificaremos la alcaldía correspondiente. Esto nos permitirá aplicar estrategias de ventas específicas para esa ubicación, considerando factores demográficos, económicos y culturales particulares de cada área en la Ciudad de México.
+
+La aplicación de métodos estadísticos en el análisis de datos permite encontrar valiosos insights que sirven como base para el desarrollo de estrategias efectivas. Este enfoque técnico permite a las empresas identificar patrones, segmentos de mercado y variables clave que influyen en sus operaciones. En un mercado inmobiliario cada vez más competitivo, el uso de tecnologías estadísticas no solo es una herramienta, sino una ventaja competitiva. A pesar del tecnicismo de estos métodos, la creatividad desempeña un papel fundamental al interpretar los resultados y diseñar estrategias innovadoras. La combinación de análisis estadísticos y la creatividad estratégica permite que las empresas estén no solo informadas, sino que también puedan destacar y adaptarse de manera efectiva en la industria.
+
+## Bibliografía
+
+-   México Desconocido. S.f. Monografía del Distrito Federal. México Desconocido. <https://www.mexicodesconocido.com.mx/mexico-estados-monografia-distrito-federal.html#:~:text=Ubicado%20en%20la%20regi%C3%B3n%20Centro%2C%20el%20DF%20%28Ciudad,la%20ciudad%20m%C3%A1s%20grande%20y%20compleja%20del%20mundo.>
+
+-   INEGI, 2020. Población de la CDMX. INEGI. <https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2021/EstSociodemo/ResultCenso2020_CdMx.pdf>
+
+-   Gutiérrez, F. (2004). Clasificación de niveles socioeconómicos en México según la AMAI. Fernando Gutiérrez. <https://www.fergut.com/clasificacion-de-niveles-socioeconomicos-en-mexico-segun-la-amai/>
